@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prop Firm Challenge Calculator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f1115',
+                        card: '#161b22',
+                        input: '#0d1117',
+                        accent: '#ffd700', // Gold/Yellow
+                        accentHover: '#e6c200',
+                        textMain: '#ffffff',
+                        textMuted: '#9ca3af'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #0f1115;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f1115;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .input-field {
+            background-color: #000000;
+            border: 1px solid #374151;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+
+        .btn-toggle {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border: 1px solid #374151;
+            transition: all 0.2s;
+        }
+        .btn-toggle.active {
+            background-color: transparent;
+            border-color: #ffd700;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .btn-toggle:first-child {
+            border-top-left-radius: 0.375rem;
+            border-bottom-left-radius: 0.375rem;
+        }
+        .btn-toggle:last-child {
+            border-top-right-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+        }
+
+        .risk-btn {
+            background-color: #0d1117;
+            border: 1px solid #374151;
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+        }
+        .risk-btn:hover {
+            border-color: #ffd700;
+        }
+        .risk-btn.active {
+            border-color: #ffd700;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .stat-card {
+            background-color: #0d1117;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            border: 1px solid #1f2937;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Header -->
+        <div class="text-center space-y-2">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-white">Prop Firm Challenge Calculator</h1>
+            <p class="text-textMuted text-sm md:text-base">Find your optimal risk per trade to minimize cost and time to funding</p>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Settings -->
+            <div class="lg:col-span-5 bg-card p-6 rounded-xl border border-gray-800 shadow-xl">
+                <h2 class="text-xl font-bold mb-6">Simulation Settings</h2>
+                
+                <!-- Strategy Settings -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-textMuted mb-3">Strategy Settings</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Win Rate (%)</label>
+                            <input type="number" id="winRate" value="40" class="input-field">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Risk Reward Ratio (1:X)</label>
+                            <input type="number" id="riskReward" value="2" step="0.1" class="input-field">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Challenge Settings -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-textMuted mb-3">Challenge Settings</h3>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Challenge Type</label>
+                            <div class="flex">
+                                <div class="btn-toggle w-1/2 text-center text-xs" onclick="setPhases(1)" id="phase1Btn">Single Phase</div>
+                                <div class="btn-toggle w-1/2 text-center text-xs active" onclick="setPhases(2)" id="phase2Btn">Two Phase</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Challenge Fee ($)</label>
+                            <input type="number" id="fee" value="500" class="input-field">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Profit Target - Phase 1 (%)</label>
+                            <input type="number" id="p1Target" value="10" class="input-field">
+                        </div>
+                        <div id="p2TargetDiv">
+                            <label class="block text-xs text-textMuted mb-1">Profit Target - Phase 2 (%)</label>
+                            <input type="number" id="p2Target" value="5" class="input-field">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Max Drawdown - Phase 1 (%)</label>
+                            <input type="number" id="p1DD" value="10" class="input-field">
+                        </div>
+                        <div id="p2DDDiv">
+                            <label class="block text-xs text-textMuted mb-1">Max Drawdown - Phase 2 (%)</label>
+                            <input type="number" id="p2DD" value="10" class="input-field">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-xs text-textMuted mb-1">Drawdown Type</label>
+                        <div class="flex">
+                            <div class="btn-toggle w-1/2 text-center text-xs active" onclick="setDDType('initial')" id="ddInitial">Initial Balance</div>
+                            <div class="btn-toggle w-1/2 text-center text-xs" onclick="setDDType('trailing')" id="ddTrailing">Trailing</div>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-1">From starting balance vs from high-water mark.</p>
+                    </div>
+                </div>
+
+                <!-- Funded Account -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-textMuted mb-3">Funded Account</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Account Size ($)</label>
+                            <input type="number" id="accountSize" value="100000" class="input-field">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-textMuted mb-1">Profit Split (%)</label>
+                            <input type="number" id="profitSplit" value="80" class="input-field">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="runSimulation()" class="w-full bg-accent hover:bg-accentHover text-black font-bold py-3 px-4 rounded transition duration-200">
+                    Run Simulation
+                </button>
+            </div>
+
+            <!-- Right Column: Results -->
+            <div class="lg:col-span-7 bg-card p-6 rounded-xl border border-gray-800 shadow-xl flex flex-col">
+                <h2 class="text-xl font-bold mb-6">Results</h2>
+
+                <!-- Risk Selectors -->
+                <div class="space-y-4 mb-8">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs text-textMuted">Phase 1 Risk per Trade:</label>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2" id="riskGrid1">
+                            <!-- JS Generates Buttons -->
+                        </div>
+                    </div>
+                    <div id="riskRow2">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs text-textMuted">Phase 2 Risk per Trade:</label>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2" id="riskGrid2">
+                             <!-- JS Generates Buttons -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resPassRate">--%</div>
+                        <div class="text-xs text-textMuted">Pass Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resAvgTrades">--</div>
+                        <div class="text-xs text-textMuted">Trades per Successful Attempt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resAttempts">--</div>
+                        <div class="text-xs text-textMuted">Challenge Attempts Needed</div>
+                        <div class="text-[10px] text-gray-500">90% confidence estimate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resTotalTrades">--</div>
+                        <div class="text-xs text-textMuted">Expected Trades to Get Funded</div>
+                        <div class="text-[10px] text-gray-500">90% confidence estimate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resCost">--</div>
+                        <div class="text-xs text-textMuted">Expected Cost to Fund</div>
+                        <div class="text-[10px] text-gray-500">Budget this much to be safe</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-3xl font-bold text-white" id="resRuin">--%</div>
+                        <div class="text-xs text-textMuted">Risk of 5+ Consecutive Failures</div>
+                        <div class="text-[10px] text-gray-500">Chance of long losing streak</div>
+                    </div>
+                </div>
+
+                <!-- Break Even -->
+                <div class="mt-auto bg-black bg-opacity-30 p-4 rounded border-l-4 border-accent">
+                    <h4 class="text-accent font-bold text-sm mb-1">Break-Even Analysis</h4>
+                    <p class="text-xs text-textMuted" id="breakEvenText">Need --% return on funded account to recover costs.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
+            <div class="bg-card p-6 rounded-xl border border-gray-800 shadow-xl">
+                <h3 class="text-lg font-bold mb-4">Pass Rate vs Risk</h3>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartPassRate"></canvas>
+                </div>
+            </div>
+            <div class="bg-card p-6 rounded-xl border border-gray-800 shadow-xl">
+                <h3 class="text-lg font-bold mb-4">Expected Cost to Fund</h3>
+                <div class="text-xs text-gray-500 mb-2">Recommended budget (90% confidence)</div>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartCost"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // State
+        let isTwoPhase = true;
+        let isTrailing = false;
+        let selectedRisk1 = 2.0; // Default selection
+        let selectedRisk2 = 2.0; // Default selection
+        const riskOptions = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+        let chartPassInstance = null;
+        let chartCostInstance = null;
+
+        // --- UI Setup ---
+        function initRiskButtons() {
+            const grid1 = document.getElementById('riskGrid1');
+            const grid2 = document.getElementById('riskGrid2');
+            grid1.innerHTML = '';
+            grid2.innerHTML = '';
+
+            riskOptions.forEach(r => {
+                // Phase 1 Buttons
+                const btn1 = document.createElement('button');
+                btn1.className = `risk-btn ${r === selectedRisk1 ? 'active' : ''}`;
+                btn1.innerText = `${r}%`;
+                btn1.onclick = () => {
+                    selectedRisk1 = r;
+                    updateRiskUI();
+                    calculateSpecificStats(); // Update stats without re-running full sim
+                };
+                grid1.appendChild(btn1);
+
+                // Phase 2 Buttons
+                const btn2 = document.createElement('button');
+                btn2.className = `risk-btn ${r === selectedRisk2 ? 'active' : ''}`;
+                btn2.innerText = `${r}%`;
+                btn2.onclick = () => {
+                    selectedRisk2 = r;
+                    updateRiskUI();
+                    calculateSpecificStats();
+                };
+                grid2.appendChild(btn2);
+            });
+        }
+
+        function updateRiskUI() {
+            const btns1 = document.getElementById('riskGrid1').children;
+            const btns2 = document.getElementById('riskGrid2').children;
+            
+            Array.from(btns1).forEach(b => {
+                b.classList.toggle('active', b.innerText === `${selectedRisk1}%`);
+            });
+            Array.from(btns2).forEach(b => {
+                b.classList.toggle('active', b.innerText === `${selectedRisk2}%`);
+            });
+        }
+
+        function setPhases(n) {
+            isTwoPhase = n === 2;
+            document.getElementById('phase1Btn').classList.toggle('active', !isTwoPhase);
+            document.getElementById('phase2Btn').classList.toggle('active', isTwoPhase);
+            
+            // Toggle visibility of Phase 2 inputs
+            const display = isTwoPhase ? 'block' : 'none';
+            document.getElementById('p2TargetDiv').style.display = display;
+            document.getElementById('p2DDDiv').style.display = display;
+            document.getElementById('riskRow2').style.display = display;
+        }
+
+        function setDDType(type) {
+            isTrailing = type === 'trailing';
+            document.getElementById('ddInitial').classList.toggle('active', !isTrailing);
+            document.getElementById('ddTrailing').classList.toggle('active', isTrailing);
+        }
+
+        // --- Simulation Logic (Monte Carlo) ---
+        
+        // Cache to store simulation results for all risk levels to avoid re-running when clicking buttons
+        let simCache = {}; 
+
+        function runSimulation() {
+            // Get Inputs
+            const winRate = parseFloat(document.getElementById('winRate').value) / 100;
+            const rr = parseFloat(document.getElementById('riskReward').value);
+            const fee = parseFloat(document.getElementById('fee').value);
+            const p1Target = parseFloat(document.getElementById('p1Target').value) / 100;
+            const p2Target = isTwoPhase ? parseFloat(document.getElementById('p2Target').value) / 100 : 0;
+            const p1DD = parseFloat(document.getElementById('p1DD').value) / 100;
+            const p2DD = isTwoPhase ? parseFloat(document.getElementById('p2DD').value) / 100 : 0;
+            const acctSize = parseFloat(document.getElementById('accountSize').value);
+
+            // Clear Cache
+            simCache = {};
+
+            // We need to simulate for EACH risk level to populate charts
+            // To keep UI responsive, we run fewer iterations per risk level (e.g., 1000)
+            const iterations = 1500; 
+
+            riskOptions.forEach(risk => {
+                simCache[risk] = simulateRiskLevel(
+                    risk/100, iterations, winRate, rr, p1Target, p2Target, p1DD, p2DD, fee
+                );
+            });
+
+            // Update UI based on currently selected risks
+            calculateSpecificStats();
+            
+            // Update Charts
+            updateCharts();
+        }
+
+        function simulateRiskLevel(riskPct, iterations, winRate, rr, p1Target, p2Target, p1DD, p2DD, fee) {
+            let passedCount = 0;
+            let totalTradesForPass = 0;
+            let attemptsArr = []; // To calculate percentiles
+
+            for(let i=0; i<iterations; i++) {
+                // Phase 1
+                let p1Res = simulatePhase(riskPct, winRate, rr, p1Target, p1DD);
+                
+                if(p1Res.passed) {
+                    if(isTwoPhase) {
+                        // Phase 2 (Assuming same risk for simplicity in chart generation, 
+                        // though UI allows mix. For Chart data, we assume Risk P1 = Risk P2)
+                        let p2Res = simulatePhase(riskPct, winRate, rr, p2Target, p2DD);
+                        if(p2Res.passed) {
+                            passedCount++;
+                            totalTradesForPass += (p1Res.trades + p2Res.trades);
+                        }
+                    } else {
+                        passedCount++;
+                        totalTradesForPass += p1Res.trades;
+                    }
+                }
+            }
+
+            const passRate = (passedCount / iterations);
+            
+            // Math for "Attempts Needed" (Geometric Distribution)
+            // Expected attempts = 1 / p
+            // 90% confidence we get funded within N attempts: 1 - (1-p)^N >= 0.90
+            let attempts90 = passRate > 0 ? Math.ceil(Math.log(1 - 0.90) / Math.log(1 - passRate)) : 100;
+            if(attempts90 > 100) attempts90 = 100; // Cap visual
+
+            const costToFund = attempts90 * fee;
+
+            return {
+                passRate: passRate,
+                avgTrades: passedCount > 0 ? Math.round(totalTradesForPass / passedCount) : 0,
+                attempts90: attempts90,
+                costToFund: costToFund
+            };
+        }
+
+        function simulatePhase(risk, winRate, rr, targetPct, maxDDPct) {
+            let balance = 1.0; // Normalized
+            let highWaterMark = 1.0;
+            let trades = 0;
+            const target = 1.0 + targetPct;
+            
+            // Hard limit on trades to prevent infinite loops in bad strategies
+            while(trades < 500) {
+                trades++;
+                const isWin = Math.random() < winRate;
+                
+                if(isWin) {
+                    balance = balance + (balance * risk * rr);
+                } else {
+                    balance = balance - (balance * risk);
+                }
+
+                if(balance >= highWaterMark) highWaterMark = balance;
+
+                // Check Target
+                if(balance >= target) {
+                    return { passed: true, trades: trades };
+                }
+
+                // Check Drawdown
+                let currentDD;
+                if(isTrailing) {
+                    // Trailing DD: Percentage drop from HWM
+                    currentDD = (highWaterMark - balance) / highWaterMark;
+                } else {
+                    // Initial DD: Percentage drop from Initial (1.0)
+                    currentDD = (1.0 - balance); // relative to initial
+                }
+
+                if(currentDD >= maxDDPct) {
+                    return { passed: false, trades: trades };
+                }
+            }
+            return { passed: false, trades: trades }; // Timed out (unlikely with 500 cap)
+        }
+
+        function calculateSpecificStats() {
+            // This function runs when buttons change. 
+            // We can't use the simple cached chart data because Phase 1 and 2 might have diff risks.
+            // We run a quick dedicated sim (e.g., 2000 runs) for the specific combination.
+            
+            const winRate = parseFloat(document.getElementById('winRate').value) / 100;
+            const rr = parseFloat(document.getElementById('riskReward').value);
+            const fee = parseFloat(document.getElementById('fee').value);
+            const p1Target = parseFloat(document.getElementById('p1Target').value) / 100;
+            const p2Target = isTwoPhase ? parseFloat(document.getElementById('p2Target').value) / 100 : 0;
+            const p1DD = parseFloat(document.getElementById('p1DD').value) / 100;
+            const p2DD = isTwoPhase ? parseFloat(document.getElementById('p2DD').value) / 100 : 0;
+            const acctSize = parseFloat(document.getElementById('accountSize').value);
+            const profitSplit = parseFloat(document.getElementById('profitSplit').value) / 100;
+
+            const r1 = selectedRisk1 / 100;
+            const r2 = isTwoPhase ? selectedRisk2 / 100 : 0;
+            
+            let passed = 0;
+            let totalTrades = 0;
+            const iterations = 2000;
+
+            for(let i=0; i<iterations; i++) {
+                let p1 = simulatePhase(r1, winRate, rr, p1Target, p1DD);
+                if(p1.passed) {
+                    if(isTwoPhase) {
+                        let p2 = simulatePhase(r2, winRate, rr, p2Target, p2DD);
+                        if(p2.passed) {
+                            passed++;
+                            totalTrades += (p1.trades + p2.trades);
+                        }
+                    } else {
+                        passed++;
+                        totalTrades += p1.trades;
+                    }
+                }
+            }
+
+            const pRate = passed/iterations;
+            const avgT = passed > 0 ? Math.round(totalTrades/passed) : 0;
+            
+            let attempts90 = pRate > 0.001 ? Math.ceil(Math.log(0.1) / Math.log(1 - pRate)) : ">100";
+            if(typeof attempts90 === 'number' && attempts90 > 100) attempts90 = ">100";
+            
+            const costVal = typeof attempts90 === 'number' ? attempts90 * fee : 100 * fee;
+            const expectedTotalTrades = typeof attempts90 === 'number' ? attempts90 * avgT : 0;
+
+            // Risk of 5 consecutive losses
+            // P(5 losses) = (1-WR)^5
+            const lossStreak = Math.pow((1-winRate), 5) * 100;
+
+            // Break Even
+            const cost = typeof attempts90 === 'number' ? (attempts90 * fee) : 0;
+            // Needed Profit = Cost / ProfitSplit
+            // Return % = (Needed Profit / AccountSize) * 100
+            const bePct = ((cost / profitSplit) / acctSize) * 100;
+
+            // DOM Updates
+            document.getElementById('resPassRate').innerText = (pRate * 100).toFixed(1) + '%';
+            document.getElementById('resAvgTrades').innerText = avgT;
+            document.getElementById('resAttempts').innerText = attempts90;
+            document.getElementById('resTotalTrades').innerText = expectedTotalTrades > 0 ? expectedTotalTrades : '--';
+            document.getElementById('resCost').innerText = '$' + costVal.toLocaleString();
+            document.getElementById('resRuin').innerText = lossStreak.toFixed(1) + '%';
+            
+            document.getElementById('breakEvenText').innerText = 
+                `Need ${bePct.toFixed(2)}% return on $${acctSize.toLocaleString()} funded account to recover challenge costs.`;
+        }
+
+        // --- Charts ---
+
+        function updateCharts() {
+            // Data preparation
+            const labels = riskOptions.map(r => r + '%');
+            const passRates = riskOptions.map(r => (simCache[r].passRate * 100));
+            const costs = riskOptions.map(r => simCache[r].costToFund);
+
+            // Pass Rate Chart
+            const ctxPass = document.getElementById('chartPassRate').getContext('2d');
+            if(chartPassInstance) chartPassInstance.destroy();
+
+            chartPassInstance = new Chart(ctxPass, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Pass Rate (%)',
+                        data: passRates,
+                        borderColor: '#ffd700',
+                        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                        pointBackgroundColor: '#ffd700',
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: {
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+
+            // Cost Chart
+            const ctxCost = document.getElementById('chartCost').getContext('2d');
+            if(chartCostInstance) chartCostInstance.destroy();
+
+            chartCostInstance = new Chart(ctxCost, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Est. Cost ($)',
+                        data: costs,
+                        backgroundColor: '#ffd700',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialization
+        window.onload = function() {
+            initRiskButtons();
+            // Run a default simulation on load for visual pop
+            runSimulation();
+        };
+
+    </script>
+</body>
+</html>
